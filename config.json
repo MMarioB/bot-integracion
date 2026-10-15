@@ -41,6 +41,12 @@
       "location": "Comunidad de Madrid",
       "label": "BOCM",
       "title_from_description": true
+    },
+    {
+      "name": "boam",
+      "url": "https://www.madrid.es/ContentPublisher/jsp/apl/obtenerRSS.jsp?tipoContenido=Boletin&idCanal=9159e3d5d3e07010VgnVCM100000dc0ca8c0RCRD",
+      "location": "Madrid (ciudad)",
+      "label": "BOAM · Ayuntamiento de Madrid"
     }
   ],
   "state_path": "data/seen.json",
