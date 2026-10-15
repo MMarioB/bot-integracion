@@ -83,6 +83,8 @@ func SourceLabel(src string) string {
 		return "Hacesfalta.org"
 	case "infojobs":
 		return "InfoJobs"
+	case "adzuna":
+		return "Adzuna"
 	case "bocm":
 		return "el BOCM"
 	case "boe":

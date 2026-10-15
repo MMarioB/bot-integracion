@@ -17,7 +17,7 @@
     "voluntariado"
   ],
   "infojobs": {
-    "enabled": true,
+    "enabled": false,
     "province": "madrid",
     "queries": [
       "integrador social",
@@ -32,6 +32,16 @@
       "integrador social",
       "integradora social",
       "integracion social"
+    ]
+  },
+  "adzuna": {
+    "enabled": true,
+    "where": "Madrid",
+    "max_days_old": 14,
+    "queries": [
+      "integrador social",
+      "integradora social",
+      "integración social"
     ]
   },
   "boe": {

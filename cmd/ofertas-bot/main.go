@@ -35,6 +35,12 @@ type Config struct {
 		Province string   `json:"province"`
 		Queries  []string `json:"queries"`
 	} `json:"hacesfalta"`
+	Adzuna struct {
+		Enabled    bool     `json:"enabled"`
+		Where      string   `json:"where"`
+		Queries    []string `json:"queries"`
+		MaxDaysOld int      `json:"max_days_old"`
+	} `json:"adzuna"`
 	BOE struct {
 		Enabled bool `json:"enabled"`
 		Days    int  `json:"days"`
@@ -281,6 +287,17 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 		fs = append(fs, &fetch.Hacesfalta{
 			Queries: cfg.Hacesfalta.Queries, Province: cfg.Hacesfalta.Province, HTTP: httpc,
 		})
+	}
+	if cfg.Adzuna.Enabled {
+		id, key := os.Getenv("ADZUNA_APP_ID"), os.Getenv("ADZUNA_APP_KEY")
+		if id == "" || key == "" {
+			log.Warn("Adzuna activado pero faltan ADZUNA_APP_ID/ADZUNA_APP_KEY; se omite")
+		} else {
+			fs = append(fs, &fetch.Adzuna{
+				AppID: id, AppKey: key, Country: "es", Where: cfg.Adzuna.Where,
+				Queries: cfg.Adzuna.Queries, MaxDaysOld: cfg.Adzuna.MaxDaysOld, HTTP: httpc,
+			})
+		}
 	}
 	if cfg.BOE.Enabled {
 		fs = append(fs, &fetch.BOE{Days: cfg.BOE.Days, HTTP: httpc})
