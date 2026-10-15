@@ -1,0 +1,37 @@
+{
+  "keywords": [
+    "integrador social",
+    "integradora social",
+    "integrador/a social",
+    "integracion social",
+    "tisoc",
+    "mediador social",
+    "mediadora social",
+    "mediador/a social",
+    "mediador intercultural",
+    "mediadora intercultural"
+  ],
+  "exclude": [
+    "voluntario",
+    "voluntaria",
+    "voluntariado"
+  ],
+  "infojobs": {
+    "enabled": true,
+    "province": "madrid",
+    "queries": [
+      "integrador social",
+      "integradora social",
+      "integración social"
+    ]
+  },
+  "rss": [
+    {
+      "name": "bocm",
+      "url": "https://www.bocm.es/ultimo-boletin.xml",
+      "location": "Comunidad de Madrid"
+    }
+  ],
+  "state_path": "data/seen.json",
+  "state_max_days": 120
+}

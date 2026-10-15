@@ -1,0 +1,46 @@
+name: ofertas-bot
+
+on:
+  schedule:
+    # Cada 2 horas de 7:00 a 21:00 (UTC; en Madrid es +1/+2h)
+    - cron: "17 5-19/2 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ofertas-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # El estado (ofertas ya avisadas) se guarda en la caché de Actions.
+      # Cada ejecución guarda una entrada nueva y restaura la más reciente.
+      - name: Restaurar estado
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: ofertas-state-${{ github.run_id }}
+          restore-keys: ofertas-state-
+
+      - name: Buscar ofertas
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          INFOJOBS_CLIENT_ID: ${{ secrets.INFOJOBS_CLIENT_ID }}
+          INFOJOBS_CLIENT_SECRET: ${{ secrets.INFOJOBS_CLIENT_SECRET }}
+        run: go run ./cmd/ofertas-bot -once
+
+      - name: Guardar estado
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: ofertas-state-${{ github.run_id }}
