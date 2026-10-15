@@ -39,7 +39,7 @@ func TestTelegramSend(t *testing.T) {
 }
 
 func TestFormatDigest(t *testing.T) {
-	if msgs := FormatDigest(nil); len(msgs) != 1 || !strings.Contains(msgs[0], "no hay ofertas") {
+	if msgs := FormatDigest(nil); len(msgs) != 1 || !strings.Contains(msgs[0], "no hay nada abierto") {
 		t.Errorf("resumen vacío inesperado: %v", msgs)
 	}
 
@@ -67,7 +67,10 @@ func TestFormatDigest(t *testing.T) {
 	if total != 60 {
 		t.Errorf("se esperaban 60 ofertas en el resumen, hay %d", total)
 	}
-	if !strings.Contains(msgs[0], "Estas son las 60 ofertas") {
+	if !strings.Contains(msgs[len(msgs)-1], "Sin prisa") {
+		t.Error("falta el pie tranquilizador en el último mensaje")
+	}
+	if !strings.Contains(msgs[0], "<b>60 ofertas abiertas</b>") {
 		t.Errorf("cabecera inesperada: %s", msgs[0][:100])
 	}
 }

@@ -76,10 +76,33 @@ func (t *Telegram) send(ctx context.Context, text string) error {
 	return nil
 }
 
+// SourceLabel da un nombre legible a cada fuente.
+func SourceLabel(src string) string {
+	switch src {
+	case "hacesfalta":
+		return "Hacesfalta.org"
+	case "infojobs":
+		return "InfoJobs"
+	case "bocm":
+		return "el BOCM"
+	case "boe":
+		return "el BOE"
+	case "boam":
+		return "el BOAM"
+	}
+	return src
+}
+
+// isPublic indica si la fuente es un boletín oficial (convocatorias públicas).
+func isPublic(src string) bool {
+	return src == "boe" || src == "bocm" || src == "boam"
+}
+
 // FormatJob compone el mensaje HTML de una oferta.
 func FormatJob(j job.Job) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "🆕 <b>%s</b>\n", html.EscapeString(truncate(j.Title, 250)))
+	b.WriteString("✨ <i>Ha salido algo que puede encajarte</i>\n\n")
+	fmt.Fprintf(&b, "<b>%s</b>\n", html.EscapeString(truncate(j.Title, 250)))
 	if j.Company != "" {
 		fmt.Fprintf(&b, "🏢 %s\n", html.EscapeString(j.Company))
 	}
@@ -89,34 +112,43 @@ func FormatJob(j job.Job) string {
 	if j.Summary != "" {
 		fmt.Fprintf(&b, "📝 %s\n", html.EscapeString(truncate(j.Summary, 300)))
 	}
-	fmt.Fprintf(&b, "🔗 <a href=\"%s\">Ver oferta</a> · <i>%s</i>", html.EscapeString(j.URL), html.EscapeString(j.Source))
+	if isPublic(j.Source) {
+		b.WriteString("ℹ️ Es una convocatoria pública: en el enlace están las bases y el plazo para presentarse.\n")
+	}
+	fmt.Fprintf(&b, "\n👉 <a href=\"%s\">Ver la oferta</a> <i>(vía %s)</i>",
+		html.EscapeString(j.URL), html.EscapeString(SourceLabel(j.Source)))
 	return b.String()
 }
 
 // maxMsg deja margen bajo el límite de 4096 caracteres de Telegram.
 const maxMsg = 3800
 
-// FormatDigest compone el resumen inicial con todas las ofertas actuales,
+const intro = "👋 <b>¡Hola! Soy tu buscador de ofertas de integración social en Madrid.</b>\n\n" +
+	"Cada pocas horas reviso por ti portales de empleo y boletines oficiales, " +
+	"para que no tengas que estar mirando tú. Cuando salga algo que encaje, te llega aquí.\n\n"
+
+const calmFooter = "\n💛 Sin prisa: no hace falta mirarlas todas hoy. Yo sigo buscando."
+
+// FormatDigest compone el mensaje de bienvenida con las ofertas abiertas ahora mismo,
 // partido en varios mensajes si no cabe en uno.
 func FormatDigest(jobs []job.Job) []string {
 	if len(jobs) == 0 {
-		return []string{"👋 <b>Bot de ofertas en marcha.</b>\nAhora mismo no hay ofertas publicadas que encajen. " +
-			"Te aviso en cuanto salga alguna."}
+		return []string{intro + "Ahora mismo no hay nada abierto que encaje, pero esto se mueve: " +
+			"en cuanto aparezca algo, te escribo. 💛"}
 	}
-	header := fmt.Sprintf("👋 <b>Bot de ofertas en marcha.</b>\nEstas son las %d ofertas publicadas ahora mismo. "+
-		"A partir de aquí te aviso solo de las nuevas.\n\n", len(jobs))
-	return digest(header, jobs)
+	header := intro + fmt.Sprintf("Para empezar, estas son las <b>%d ofertas abiertas</b> ahora mismo que encajan contigo:\n\n", len(jobs))
+	return digest(header, jobs, calmFooter)
 }
 
 // FormatSourceDigest presenta de golpe lo que ya había en una fuente recién añadida,
 // en vez de mandar cada oferta como si fuera nueva.
 func FormatSourceDigest(source string, jobs []job.Job) []string {
-	header := fmt.Sprintf("🔌 <b>Nueva fuente: %s</b>\nEstas son las %d ofertas que tiene publicadas ahora mismo. "+
-		"A partir de aquí te aviso solo de las nuevas.\n\n", html.EscapeString(source), len(jobs))
-	return digest(header, jobs)
+	header := fmt.Sprintf("🔎 <b>Ahora también busco en %s</b>\nHe encontrado <b>%d ofertas abiertas</b> que encajan contigo:\n\n",
+		html.EscapeString(source), len(jobs))
+	return digest(header, jobs, calmFooter)
 }
 
-func digest(header string, jobs []job.Job) []string {
+func digest(header string, jobs []job.Job, footer string) []string {
 	var msgs []string
 	var b strings.Builder
 	b.WriteString(header)
@@ -141,9 +173,12 @@ func digest(header string, jobs []job.Job) []string {
 		}
 		b.WriteString(line.String())
 	}
-	if b.Len() > 0 {
+	if b.Len()+len(footer) > maxMsg {
 		msgs = append(msgs, b.String())
+		b.Reset()
 	}
+	b.WriteString(footer)
+	msgs = append(msgs, b.String())
 	return msgs
 }
 

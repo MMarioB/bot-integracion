@@ -64,7 +64,7 @@ func TestNewSourceGoesToDigest(t *testing.T) {
 	n := &fakeNotifier{}
 	bocm := &fakeFetcher{name: "bocm", jobs: []job.Job{offer("bocm", "1")}}
 	newApp(t, st, n, bocm).RunOnce(context.Background())
-	if len(n.digests) != 1 || !strings.Contains(n.digests[0], "Bot de ofertas en marcha") || len(n.jobs) != 0 {
+	if len(n.digests) != 1 || !strings.Contains(n.digests[0], "Soy tu buscador") || len(n.jobs) != 0 {
 		t.Fatalf("arranque: digests=%v jobs=%v", n.digests, n.jobs)
 	}
 
@@ -75,8 +75,8 @@ func TestNewSourceGoesToDigest(t *testing.T) {
 	bocm.jobs = append(bocm.jobs, offer("bocm", "2"))
 	hf := &fakeFetcher{name: "hacesfalta", jobs: []job.Job{offer("hacesfalta", "a"), offer("hacesfalta", "b"), offer("hacesfalta", "c")}}
 	newApp(t, st, n, bocm, hf).RunOnce(context.Background())
-	if len(n.digests) != 1 || !strings.Contains(n.digests[0], "Nueva fuente: Hacesfalta.org") ||
-		!strings.Contains(n.digests[0], "3 ofertas") {
+	if len(n.digests) != 1 || !strings.Contains(n.digests[0], "Ahora también busco en Hacesfalta.org") ||
+		!strings.Contains(n.digests[0], "3 ofertas abiertas") {
 		t.Fatalf("fuente nueva: digests=%v", n.digests)
 	}
 	if len(n.jobs) != 1 || n.jobs[0] != "bocm:2" {

@@ -3,8 +3,12 @@
 Bot en Go que busca ofertas de **integración social en Madrid** y las manda por **Telegram**.
 Solo usa la librería estándar.
 
+Está pensado para acompañar una búsqueda de empleo sin agobiar: mensajes cercanos,
+solo en horario de día, un resumen agrupado en vez de ráfagas de avisos y nunca mensajes
+de error ni de "hoy no hay nada" (los fallos van a los logs).
+
 ```
-fuentes (InfoJobs API, Hacesfalta.org, RSS del BOCM/BOAM…) → filtro por palabras clave → dedupe → Telegram
+fuentes (InfoJobs, Hacesfalta.org, BOE, BOCM…) → filtro por palabras clave → dedupe → Telegram
 ```
 
 ## Puesta en marcha
@@ -41,7 +45,7 @@ go run ./cmd/ofertas-bot -once -digest
 ## Despliegue
 
 **GitHub Actions (gratis, sin servidor).** El workflow `.github/workflows/ofertas.yml`
-se ejecuta cada 2 horas en horario diurno. Añade en *Settings → Secrets → Actions*:
+se ejecuta cada 2 horas, solo de día (aprox. 8–20 h en Madrid). Añade en *Settings → Secrets → Actions*:
 `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `INFOJOBS_CLIENT_ID`, `INFOJOBS_CLIENT_SECRET`.
 El estado se guarda en la caché de Actions. Nota: GitHub desactiva los crons de repos sin
 actividad durante 60 días; un commit de vez en cuando lo evita.
@@ -62,6 +66,7 @@ docker run -d --name ofertas-bot --restart unless-stopped \
 | `exclude` | Si contiene alguna, se descarta (p. ej. voluntariado). |
 | `infojobs.queries` | Búsquedas que se lanzan contra InfoJobs. |
 | `hacesfalta` | Búsquedas en las ofertas remuneradas de Hacesfalta.org, quedándose solo con las de `province`. |
+| `boe` | Sumario del BOE (sección II.B, oposiciones y concursos) de los últimos `days` días, vía su API de datos abiertos. Se queda con lo de Madrid (Ayuntamiento, municipios, Comunidad) y lo estatal; de los anuncios de Madrid descarga el texto para filtrar dentro. |
 | `bulletins` | Boletines cuyo RSS solo enlaza al boletín del día (BOAM). Ver abajo. |
 | `rss` | Lista de feeds RSS. Añadir una fuente nueva con RSS = añadir una entrada aquí. `label` es el nombre que se muestra y `title_from_description` usa la descripción como título (para feeds con títulos genéricos, como el BOCM). |
 | `state_max_days` | Días que se recuerda una oferta ya avisada. |
@@ -71,16 +76,18 @@ Cuando se añade una fuente a un bot que ya está en marcha, lo que esa fuente t
 llega en **un resumen agrupado** ("Nueva fuente: …") en vez de como alertas sueltas.
 
 ### Boletines (`bulletins`)
-Para boletines cuyo RSS solo anuncia "ha salido el boletín de hoy", como el **BOAM** del
-Ayuntamiento de Madrid (RSS sacado de datos.madrid.es). El bot entra en la página de los
-`max_bulletins` boletines más recientes y convierte cada anuncio del sumario en una oferta
-que pasa por el filtro de palabras clave.
+Para boletines cuyo RSS solo anuncia "ha salido el boletín de hoy". El bot entra en la página
+de los `max_bulletins` boletines más recientes y convierte cada anuncio del sumario en una
+oferta que pasa por el filtro de palabras clave.
+
+> El **BOAM** no se puede usar así: `sede.madrid.es` responde 403 a clientes que no son
+> navegadores. Las convocatorias del Ayuntamiento de Madrid se cubren a través del **BOE**.
 
 ## Estructura
 ```
 cmd/ofertas-bot/     main: config, bucle, orquestación
 internal/job/        modelo Job + interfaz Fetcher
-internal/fetch/      InfoJobs, Hacesfalta.org, RSS genérico, boletines (BOAM)
+internal/fetch/      InfoJobs, Hacesfalta.org, BOE (API), RSS genérico, boletines
 internal/filter/     palabras clave
 internal/store/      ofertas ya vistas (JSON; cambiable por SQLite)
 internal/notify/     Telegram y salida por consola

@@ -35,6 +35,10 @@ type Config struct {
 		Province string   `json:"province"`
 		Queries  []string `json:"queries"`
 	} `json:"hacesfalta"`
+	BOE struct {
+		Enabled bool `json:"enabled"`
+		Days    int  `json:"days"`
+	} `json:"boe"`
 	RSS []struct {
 		Name                 string `json:"name"`
 		URL                  string `json:"url"`
@@ -233,7 +237,7 @@ func (a *App) digestNewSources(ctx context.Context, fresh []job.Job) []job.Job {
 			continue
 		}
 		ok := true
-		for _, msg := range notify.FormatSourceDigest(sourceLabel(src), jobs) {
+		for _, msg := range notify.FormatSourceDigest(notify.SourceLabel(src), jobs) {
 			if err := a.notifier.HTML(ctx, msg); err != nil {
 				a.log.Error("telegram", "err", err)
 				ok = false
@@ -249,20 +253,6 @@ func (a *App) digestNewSources(ctx context.Context, fresh []job.Job) []job.Job {
 		a.log.Info("resumen de fuente nueva enviado", "fuente", src, "ofertas", len(jobs))
 	}
 	return rest
-}
-
-func sourceLabel(src string) string {
-	switch src {
-	case "hacesfalta":
-		return "Hacesfalta.org"
-	case "infojobs":
-		return "InfoJobs"
-	case "bocm":
-		return "BOCM"
-	case "boam":
-		return "BOAM (Ayuntamiento de Madrid)"
-	}
-	return src
 }
 
 func (a *App) save() {
@@ -291,6 +281,9 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 		fs = append(fs, &fetch.Hacesfalta{
 			Queries: cfg.Hacesfalta.Queries, Province: cfg.Hacesfalta.Province, HTTP: httpc,
 		})
+	}
+	if cfg.BOE.Enabled {
+		fs = append(fs, &fetch.BOE{Days: cfg.BOE.Days, HTTP: httpc})
 	}
 	for _, b := range cfg.Bulletins {
 		fs = append(fs, &fetch.Bulletin{

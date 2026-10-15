@@ -2,8 +2,9 @@ name: ofertas-bot
 
 on:
   schedule:
-    # Cada 2 horas de 7:00 a 21:00 (UTC; en Madrid es +1/+2h)
-    - cron: "17 5-19/2 * * *"
+    # Cada 2 horas, solo de día: 8:17-20:17 en verano y 7:17-19:17 en invierno (hora de Madrid).
+    # Nada de avisos de noche.
+    - cron: "17 6-18/2 * * *"
   workflow_dispatch: {}
 
 concurrency:
