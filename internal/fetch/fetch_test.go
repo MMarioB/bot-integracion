@@ -4,7 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/mario/ofertas-bot/internal/job"
 )
 
 const bocmFixture = `<?xml version="1.0" encoding="ISO-8859-1"?>
@@ -163,5 +166,62 @@ func TestHacesfaltaFetch(t *testing.T) {
 	}
 	if jobs[1].Location != "Alcalá de Henares, Madrid" || jobs[1].Company != "Cruz Roja Española" {
 		t.Errorf("segunda oferta mal parseada: %+v", jobs[1])
+	}
+}
+
+func TestBulletinFetch(t *testing.T) {
+	var srvURL string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/rss", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>BOAM</title>
+<item><title>10234,BOAM de 15 de octubre de 2026</title><link>` + srvURL + `/boletin?id=10234&amp;c=1</link>
+<guid>b10234</guid><pubDate>Thu, 15 Oct 2026 00:00:00 +0200</pubDate></item>
+<item><title>10233,BOAM de 14 de octubre de 2026</title><link>` + srvURL + `/boletin?id=10233</link>
+<guid>b10233</guid><pubDate>Wed, 14 Oct 2026 00:00:00 +0200</pubDate></item>
+<item><title>10232,BOAM de 13 de octubre de 2026</title><link>` + srvURL + `/viejo</link>
+<guid>b10232</guid><pubDate>Tue, 13 Oct 2026 00:00:00 +0200</pubDate></item>
+</channel></rss>`))
+	})
+	mux.HandleFunc("/boletin", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("id") == "10234" {
+			// Enlace con título largo + enlace corto con el título justo delante.
+			w.Write([]byte(`<html><head><title>x</title><script>var a="<a href='/js'>no</a>";</script></head><body>
+<nav><a href="/">Inicio</a> <a href="#top">Arriba</a></nav>
+<ul>
+<li><a href="/anuncios/1.pdf">Resolución por la que se aprueban las bases de la bolsa de Técnico Superior en Integración Social</a></li>
+<li><span>Decreto de nombramiento de personal funcionario interino en el Distrito de Usera</span> <a href="/anuncios/2.pdf">PDF</a></li>
+</ul></body></html>`))
+			return
+		}
+		// Boletín en ISO-8859-1: "Integración"
+		w.Write([]byte("<html><body><p>Convocatoria de mediador intercultural para Servicios Sociales, Integraci\xf3n</p> <a href='/anuncios/3.pdf'>Descargar</a></body></html>"))
+	})
+	mux.HandleFunc("/viejo", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("no debería pedir boletines más allá de MaxBulletins")
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	srvURL = srv.URL
+
+	f := &Bulletin{SourceName: "boam", FeedURL: srv.URL + "/rss", Label: "BOAM", Location: "Madrid (ciudad)", MaxBulletins: 2}
+	jobs, err := f.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	byURL := map[string]job.Job{}
+	for _, j := range jobs {
+		byURL[strings.TrimPrefix(j.URL, srv.URL)] = j
+	}
+	if len(jobs) != 3 {
+		t.Fatalf("esperaba 3 anuncios (menú fuera), hay %d: %+v", len(jobs), jobs)
+	}
+	if j := byURL["/anuncios/1.pdf"]; !strings.Contains(j.Title, "Integración Social") || j.Company != "BOAM · nº 10234 (15 de octubre de 2026)" {
+		t.Errorf("anuncio 1: %+v", j)
+	}
+	if j := byURL["/anuncios/2.pdf"]; j.Title != "Decreto de nombramiento de personal funcionario interino en el Distrito de Usera" {
+		t.Errorf("anuncio 2 debería tomar el texto previo: %q", j.Title)
+	}
+	if j := byURL["/anuncios/3.pdf"]; !strings.Contains(j.Title, "Integración") {
+		t.Errorf("anuncio 3 (latin1) mal decodificado: %q", j.Title)
 	}
 }

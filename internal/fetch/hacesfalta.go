@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mario/ofertas-bot/internal/filter"
 	"github.com/mario/ofertas-bot/internal/job"
@@ -147,5 +148,15 @@ func getHTML(ctx context.Context, c *http.Client, u string) (string, error) {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
-	return string(b), err
+	if err != nil {
+		return "", err
+	}
+	if !utf8.Valid(b) { // webs antiguas en ISO-8859-1 / Windows-1252
+		out := make([]byte, 0, len(b)+len(b)/8)
+		for _, c := range b {
+			out = utf8.AppendRune(out, rune(c))
+		}
+		b = out
+	}
+	return string(b), nil
 }

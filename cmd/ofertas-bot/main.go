@@ -42,6 +42,13 @@ type Config struct {
 		Label                string `json:"label"`
 		TitleFromDescription bool   `json:"title_from_description"`
 	} `json:"rss"`
+	Bulletins []struct {
+		Name         string `json:"name"`
+		URL          string `json:"url"`
+		Location     string `json:"location"`
+		Label        string `json:"label"`
+		MaxBulletins int    `json:"max_bulletins"`
+	} `json:"bulletins"`
 	StatePath    string `json:"state_path"`
 	StateMaxDays int    `json:"state_max_days"`
 }
@@ -283,6 +290,12 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 	if cfg.Hacesfalta.Enabled {
 		fs = append(fs, &fetch.Hacesfalta{
 			Queries: cfg.Hacesfalta.Queries, Province: cfg.Hacesfalta.Province, HTTP: httpc,
+		})
+	}
+	for _, b := range cfg.Bulletins {
+		fs = append(fs, &fetch.Bulletin{
+			SourceName: b.Name, FeedURL: b.URL, Location: b.Location,
+			Label: b.Label, MaxBulletins: b.MaxBulletins, HTTP: httpc,
 		})
 	}
 	for _, r := range cfg.RSS {

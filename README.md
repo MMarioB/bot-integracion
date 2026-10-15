@@ -62,6 +62,7 @@ docker run -d --name ofertas-bot --restart unless-stopped \
 | `exclude` | Si contiene alguna, se descarta (p. ej. voluntariado). |
 | `infojobs.queries` | Búsquedas que se lanzan contra InfoJobs. |
 | `hacesfalta` | Búsquedas en las ofertas remuneradas de Hacesfalta.org, quedándose solo con las de `province`. |
+| `bulletins` | Boletines cuyo RSS solo enlaza al boletín del día (BOAM). Ver abajo. |
 | `rss` | Lista de feeds RSS. Añadir una fuente nueva con RSS = añadir una entrada aquí. `label` es el nombre que se muestra y `title_from_description` usa la descripción como título (para feeds con títulos genéricos, como el BOCM). |
 | `state_max_days` | Días que se recuerda una oferta ya avisada. |
 
@@ -69,20 +70,17 @@ docker run -d --name ofertas-bot --restart unless-stopped \
 Cuando se añade una fuente a un bot que ya está en marcha, lo que esa fuente tenga publicado
 llega en **un resumen agrupado** ("Nueva fuente: …") en vez de como alertas sueltas.
 
-### Añadir el BOAM (Ayuntamiento de Madrid)
-El boletín del Ayuntamiento publica un RSS diario en <https://datos.madrid.es/dataset/?tags=boam>.
-Copia la URL del enlace RSS y añade a `rss`:
-```json
-{ "name": "boam", "url": "<URL del RSS>", "location": "Madrid (ciudad)", "label": "BOAM" }
-```
-Prueba con `-once -dry-run` y una keyword amplia; si los títulos salen genéricos, añade
-`"title_from_description": true`.
+### Boletines (`bulletins`)
+Para boletines cuyo RSS solo anuncia "ha salido el boletín de hoy", como el **BOAM** del
+Ayuntamiento de Madrid (RSS sacado de datos.madrid.es). El bot entra en la página de los
+`max_bulletins` boletines más recientes y convierte cada anuncio del sumario en una oferta
+que pasa por el filtro de palabras clave.
 
 ## Estructura
 ```
 cmd/ofertas-bot/     main: config, bucle, orquestación
 internal/job/        modelo Job + interfaz Fetcher
-internal/fetch/      InfoJobs, Hacesfalta.org, RSS genérico (con soporte ISO-8859-1)
+internal/fetch/      InfoJobs, Hacesfalta.org, RSS genérico, boletines (BOAM)
 internal/filter/     palabras clave
 internal/store/      ofertas ya vistas (JSON; cambiable por SQLite)
 internal/notify/     Telegram y salida por consola
