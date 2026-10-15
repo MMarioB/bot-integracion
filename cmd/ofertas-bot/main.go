@@ -18,6 +18,7 @@ import (
 	"github.com/mario/ofertas-bot/internal/fetch"
 	"github.com/mario/ofertas-bot/internal/filter"
 	"github.com/mario/ofertas-bot/internal/job"
+	"github.com/mario/ofertas-bot/internal/mailalert"
 	"github.com/mario/ofertas-bot/internal/notify"
 	"github.com/mario/ofertas-bot/internal/store"
 )
@@ -41,6 +42,12 @@ type Config struct {
 		Queries    []string `json:"queries"`
 		MaxDaysOld int      `json:"max_days_old"`
 	} `json:"adzuna"`
+	EmailAlerts struct {
+		Enabled    bool   `json:"enabled"`
+		IMAPServer string `json:"imap_server"`
+		Mailbox    string `json:"mailbox"`
+		Days       int    `json:"days"`
+	} `json:"email_alerts"`
 	BOE struct {
 		Enabled bool `json:"enabled"`
 		Days    int  `json:"days"`
@@ -69,7 +76,12 @@ func main() {
 	interval := flag.Duration("interval", 2*time.Hour, "cada cuánto buscar en modo continuo")
 	dryRun := flag.Bool("dry-run", false, "imprime por consola en vez de enviar a Telegram y no guarda estado")
 	digest := flag.Bool("digest", false, "envía un resumen con TODAS las ofertas publicadas ahora (incluidas las ya avisadas)")
+	parseEML := flag.String("parse-eml", "", "lee un correo .eml de alerta, muestra las ofertas que extrae y termina")
 	flag.Parse()
+
+	if *parseEML != "" {
+		os.Exit(runParseEML(*parseEML, *cfgPath))
+	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
@@ -288,6 +300,17 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 			Queries: cfg.Hacesfalta.Queries, Province: cfg.Hacesfalta.Province, HTTP: httpc,
 		})
 	}
+	if cfg.EmailAlerts.Enabled {
+		user, pass := os.Getenv("ALERTS_EMAIL"), os.Getenv("ALERTS_EMAIL_PASSWORD")
+		if user == "" || pass == "" {
+			log.Warn("Alertas por email activadas pero faltan ALERTS_EMAIL/ALERTS_EMAIL_PASSWORD; se omite")
+		} else {
+			fs = append(fs, &mailalert.Fetcher{
+				Addr: cfg.EmailAlerts.IMAPServer, User: user, Password: pass,
+				Mailbox: cfg.EmailAlerts.Mailbox, Days: cfg.EmailAlerts.Days,
+			})
+		}
+	}
 	if cfg.Adzuna.Enabled {
 		id, key := os.Getenv("ADZUNA_APP_ID"), os.Getenv("ADZUNA_APP_KEY")
 		if id == "" || key == "" {
@@ -334,4 +357,38 @@ func loadConfig(path string) (*Config, error) {
 		c.StateMaxDays = 120
 	}
 	return &c, nil
+}
+
+// runParseEML ayuda a ajustar el parser con correos reales sin tocar el buzón ni Telegram.
+func runParseEML(path, cfgPath string) int {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	msg, err := mailalert.ParseMessage(raw)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "no se pudo leer el correo:", err)
+		return 1
+	}
+	fmt.Println(mailalert.Describe(msg))
+	jobs, ok := mailalert.ExtractJobs(msg)
+	if !ok {
+		fmt.Println("\n⚠️  El remitente no es de un portal conocido (InfoJobs, Indeed, LinkedIn).")
+		return 1
+	}
+	f := filter.New(nil, nil)
+	if cfg, err := loadConfig(cfgPath); err == nil {
+		f = filter.New(cfg.Keywords, cfg.Exclude)
+	}
+	fmt.Printf("\n%d ofertas extraídas:\n\n", len(jobs))
+	for _, j := range jobs {
+		mark := "✅"
+		if !f.Match(j) {
+			mark = "🚫 (descartada por las exclusiones)"
+		}
+		fmt.Printf("%s %s\n   entidad: %q · ubicación: %q\n   enlace: %s\n   id: %s\n\n",
+			mark, j.Title, j.Company, j.Location, j.URL, j.Key())
+	}
+	return 0
 }

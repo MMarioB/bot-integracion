@@ -35,6 +35,8 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERTS_EMAIL: ${{ secrets.ALERTS_EMAIL }}
+          ALERTS_EMAIL_PASSWORD: ${{ secrets.ALERTS_EMAIL_PASSWORD }}
           INFOJOBS_CLIENT_ID: ${{ secrets.INFOJOBS_CLIENT_ID }}
           INFOJOBS_CLIENT_SECRET: ${{ secrets.INFOJOBS_CLIENT_SECRET }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}

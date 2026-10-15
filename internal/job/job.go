@@ -16,6 +16,9 @@ type Job struct {
 	URL       string
 	Summary   string
 	Published time.Time
+	// Prefiltered: la fuente ya filtró por la búsqueda (p. ej. una alerta guardada en un
+	// portal); solo se aplican las exclusiones, no las palabras clave.
+	Prefiltered bool
 }
 
 // Key es el identificador global usado para la deduplicación.

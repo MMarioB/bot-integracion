@@ -18,6 +18,13 @@ func TestMatch(t *testing.T) {
 		{"Integradora social", "Puesto de voluntariado", false},
 		{"Camarero/a", "", false},
 	}
+	// Ofertas ya filtradas por el portal: pasan sin keywords, pero las exclusiones mandan.
+	if !f.Match(job.Job{Title: "Educador/a centro de menores", Prefiltered: true}) {
+		t.Error("una oferta prefiltrada debería pasar sin palabras clave")
+	}
+	if f.Match(job.Job{Title: "Integradora social", Summary: "voluntariado", Prefiltered: true}) {
+		t.Error("las exclusiones deben aplicarse también a las prefiltradas")
+	}
 	for _, c := range cases {
 		got := f.Match(job.Job{Title: c.title, Summary: c.summary})
 		if got != c.want {

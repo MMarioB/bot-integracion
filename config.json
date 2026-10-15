@@ -16,6 +16,12 @@
     "voluntaria",
     "voluntariado"
   ],
+  "email_alerts": {
+    "enabled": true,
+    "imap_server": "imap.gmail.com:993",
+    "mailbox": "INBOX",
+    "days": 3
+  },
   "infojobs": {
     "enabled": false,
     "province": "madrid",
@@ -35,7 +41,7 @@
     ]
   },
   "adzuna": {
-    "enabled": true,
+    "enabled": false,
     "where": "Madrid",
     "max_days_old": 14,
     "queries": [

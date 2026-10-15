@@ -25,7 +25,7 @@ func (f *Filter) Match(j job.Job) bool {
 			return false
 		}
 	}
-	if len(f.include) == 0 {
+	if len(f.include) == 0 || j.Prefiltered {
 		return true
 	}
 	for _, in := range f.include {
