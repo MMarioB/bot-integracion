@@ -25,6 +25,15 @@
       "integración social"
     ]
   },
+  "hacesfalta": {
+    "enabled": true,
+    "province": "Madrid",
+    "queries": [
+      "integrador social",
+      "integradora social",
+      "integracion social"
+    ]
+  },
   "rss": [
     {
       "name": "bocm",

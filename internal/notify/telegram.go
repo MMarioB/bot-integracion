@@ -105,7 +105,18 @@ func FormatDigest(jobs []job.Job) []string {
 	}
 	header := fmt.Sprintf("👋 <b>Bot de ofertas en marcha.</b>\nEstas son las %d ofertas publicadas ahora mismo. "+
 		"A partir de aquí te aviso solo de las nuevas.\n\n", len(jobs))
+	return digest(header, jobs)
+}
 
+// FormatSourceDigest presenta de golpe lo que ya había en una fuente recién añadida,
+// en vez de mandar cada oferta como si fuera nueva.
+func FormatSourceDigest(source string, jobs []job.Job) []string {
+	header := fmt.Sprintf("🔌 <b>Nueva fuente: %s</b>\nEstas son las %d ofertas que tiene publicadas ahora mismo. "+
+		"A partir de aquí te aviso solo de las nuevas.\n\n", html.EscapeString(source), len(jobs))
+	return digest(header, jobs)
+}
+
+func digest(header string, jobs []job.Job) []string {
 	var msgs []string
 	var b strings.Builder
 	b.WriteString(header)

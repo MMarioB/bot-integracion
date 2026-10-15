@@ -112,3 +112,56 @@ func TestRSSTitleFromDescription(t *testing.T) {
 		t.Errorf("resumen/entidad inesperados: %+v", j)
 	}
 }
+
+const hfFixture = `<html><body>
+<div class="oferta">
+  <a href="/oportunidades/remuneradas/detalle/integradora-social-centro-de-dia/278600"><img src="logo.png"></a>
+  <h3><a href="/oportunidades/remuneradas/detalle/integradora-social-centro-de-dia/278600">Integradora social centro de d&iacute;a</a></h3>
+  <p class="ong">Fundaci&oacute;n Ejemplo</p>
+  <p class="lugar">Espa&ntilde;a(Madrid)</p>
+  <p>Buscamos integradora social para centro de d&iacute;a...</p>
+  <a href="/oportunidades/remuneradas/interes/278600">Me interesa</a>
+</div>
+<div class="oferta">
+  <h3><a href="https://www.hacesfalta.org/oportunidades/remuneradas/detalle/integrador-social-pisos-tutelados/278601?volver=1">Integrador/a social pisos tutelados</a></h3>
+  <p>Asociaci&oacute;n Otra</p><p>España (Barcelona)</p>
+</div>
+<div class="oferta">
+  <h3><a href="/oportunidades/remuneradas/detalle/tecnicoa-integracion-social/278602">Técnico/a integración social</a></h3>
+  <p>Cruz Roja Española</p><p>España (Alcalá de Henares, Madrid)</p>
+</div>
+<a href="Default.aspx?pageIndex=2">2</a>
+</body></html>`
+
+func TestHacesfaltaFetch(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oportunidades/remuneradas/Default.aspx" {
+			t.Errorf("ruta inesperada %s", r.URL.Path)
+		}
+		gotQuery = r.URL.Query().Get("clave")
+		w.Write([]byte(hfFixture))
+	}))
+	defer srv.Close()
+
+	f := &Hacesfalta{Queries: []string{"integrador social", "integradora social"}, Province: "Madrid", BaseURL: srv.URL}
+	jobs, err := f.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotQuery != "integradora social" {
+		t.Errorf("parámetro clave inesperado: %q", gotQuery)
+	}
+	// Barcelona fuera; las dos de Madrid dentro y sin duplicar entre búsquedas.
+	if len(jobs) != 2 {
+		t.Fatalf("esperaba 2 ofertas de Madrid, hay %d: %+v", len(jobs), jobs)
+	}
+	j := jobs[0]
+	if j.ID != "278600" || j.Title != "Integradora social centro de día" || j.Location != "Madrid" ||
+		j.Company != "Fundación Ejemplo" || j.URL != srv.URL+"/oportunidades/remuneradas/detalle/integradora-social-centro-de-dia/278600" {
+		t.Errorf("oferta mal parseada: %+v", j)
+	}
+	if jobs[1].Location != "Alcalá de Henares, Madrid" || jobs[1].Company != "Cruz Roja Española" {
+		t.Errorf("segunda oferta mal parseada: %+v", jobs[1])
+	}
+}

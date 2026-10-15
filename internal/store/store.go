@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -43,6 +44,20 @@ func (s *Store) Seen(key string) bool {
 	defer s.mu.Unlock()
 	_, ok := s.seen[key]
 	return ok
+}
+
+// KnowsSource indica si ya se ha guardado alguna oferta de esa fuente
+// (las claves tienen la forma "fuente:id").
+func (s *Store) KnowsSource(source string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prefix := source + ":"
+	for k := range s.seen {
+		if strings.HasPrefix(k, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) Mark(key string) {

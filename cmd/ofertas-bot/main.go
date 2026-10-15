@@ -30,6 +30,11 @@ type Config struct {
 		Province string   `json:"province"`
 		Queries  []string `json:"queries"`
 	} `json:"infojobs"`
+	Hacesfalta struct {
+		Enabled  bool     `json:"enabled"`
+		Province string   `json:"province"`
+		Queries  []string `json:"queries"`
+	} `json:"hacesfalta"`
 	RSS []struct {
 		Name                 string `json:"name"`
 		URL                  string `json:"url"`
@@ -178,6 +183,11 @@ func (a *App) RunOnce(ctx context.Context) {
 		return
 	}
 
+	// Fuente recién añadida: lo que ya tenía publicado va en un resumen, no oferta a oferta.
+	if !a.dryRun {
+		fresh = a.digestNewSources(ctx, fresh)
+	}
+
 	sent := 0
 	for _, j := range fresh {
 		if err := a.notifier.Job(ctx, j); err != nil {
@@ -191,6 +201,61 @@ func (a *App) RunOnce(ctx context.Context) {
 	if !a.dryRun {
 		a.save()
 	}
+}
+
+// digestNewSources manda un resumen por cada fuente de la que aún no se ha guardado
+// nada y devuelve el resto de ofertas para el flujo normal.
+func (a *App) digestNewSources(ctx context.Context, fresh []job.Job) []job.Job {
+	bySource := map[string][]job.Job{}
+	var order []string
+	var rest []job.Job
+	for _, j := range fresh {
+		if a.store.KnowsSource(j.Source) {
+			rest = append(rest, j)
+			continue
+		}
+		if _, ok := bySource[j.Source]; !ok {
+			order = append(order, j.Source)
+		}
+		bySource[j.Source] = append(bySource[j.Source], j)
+	}
+	for _, src := range order {
+		jobs := bySource[src]
+		if len(jobs) == 1 { // una sola oferta: mejor como alerta normal
+			rest = append(rest, jobs...)
+			continue
+		}
+		ok := true
+		for _, msg := range notify.FormatSourceDigest(sourceLabel(src), jobs) {
+			if err := a.notifier.HTML(ctx, msg); err != nil {
+				a.log.Error("telegram", "err", err)
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue // se reintenta en la siguiente pasada
+		}
+		for _, j := range jobs {
+			a.store.Mark(j.Key())
+		}
+		a.log.Info("resumen de fuente nueva enviado", "fuente", src, "ofertas", len(jobs))
+	}
+	return rest
+}
+
+func sourceLabel(src string) string {
+	switch src {
+	case "hacesfalta":
+		return "Hacesfalta.org"
+	case "infojobs":
+		return "InfoJobs"
+	case "bocm":
+		return "BOCM"
+	case "boam":
+		return "BOAM (Ayuntamiento de Madrid)"
+	}
+	return src
 }
 
 func (a *App) save() {
@@ -214,6 +279,11 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 				HTTP: httpc,
 			})
 		}
+	}
+	if cfg.Hacesfalta.Enabled {
+		fs = append(fs, &fetch.Hacesfalta{
+			Queries: cfg.Hacesfalta.Queries, Province: cfg.Hacesfalta.Province, HTTP: httpc,
+		})
 	}
 	for _, r := range cfg.RSS {
 		fs = append(fs, &fetch.RSS{

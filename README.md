@@ -4,7 +4,7 @@ Bot en Go que busca ofertas de **integración social en Madrid** y las manda por
 Solo usa la librería estándar.
 
 ```
-fuentes (InfoJobs API, RSS del BOCM…) → filtro por palabras clave → dedupe → Telegram
+fuentes (InfoJobs API, Hacesfalta.org, RSS del BOCM/BOAM…) → filtro por palabras clave → dedupe → Telegram
 ```
 
 ## Puesta en marcha
@@ -61,20 +61,34 @@ docker run -d --name ofertas-bot --restart unless-stopped \
 | `keywords` | Si el título o el resumen contiene alguna, la oferta pasa. Sin distinguir mayúsculas ni tildes. |
 | `exclude` | Si contiene alguna, se descarta (p. ej. voluntariado). |
 | `infojobs.queries` | Búsquedas que se lanzan contra InfoJobs. |
-| `rss` | Lista de feeds RSS. Añadir una fuente nueva con RSS = añadir una entrada aquí. |
+| `hacesfalta` | Búsquedas en las ofertas remuneradas de Hacesfalta.org, quedándose solo con las de `province`. |
+| `rss` | Lista de feeds RSS. Añadir una fuente nueva con RSS = añadir una entrada aquí. `label` es el nombre que se muestra y `title_from_description` usa la descripción como título (para feeds con títulos genéricos, como el BOCM). |
 | `state_max_days` | Días que se recuerda una oferta ya avisada. |
+
+### Fuentes nuevas
+Cuando se añade una fuente a un bot que ya está en marcha, lo que esa fuente tenga publicado
+llega en **un resumen agrupado** ("Nueva fuente: …") en vez de como alertas sueltas.
+
+### Añadir el BOAM (Ayuntamiento de Madrid)
+El boletín del Ayuntamiento publica un RSS diario en <https://datos.madrid.es/dataset/?tags=boam>.
+Copia la URL del enlace RSS y añade a `rss`:
+```json
+{ "name": "boam", "url": "<URL del RSS>", "location": "Madrid (ciudad)", "label": "BOAM" }
+```
+Prueba con `-once -dry-run` y una keyword amplia; si los títulos salen genéricos, añade
+`"title_from_description": true`.
 
 ## Estructura
 ```
 cmd/ofertas-bot/     main: config, bucle, orquestación
 internal/job/        modelo Job + interfaz Fetcher
-internal/fetch/      InfoJobs, RSS genérico (con soporte ISO-8859-1)
+internal/fetch/      InfoJobs, Hacesfalta.org, RSS genérico (con soporte ISO-8859-1)
 internal/filter/     palabras clave
 internal/store/      ofertas ya vistas (JSON; cambiable por SQLite)
 internal/notify/     Telegram y salida por consola
 ```
 
 ## Siguientes pasos
-- Fetchers para Hacesfalta.org / Canal ONG y empleo público del Ayuntamiento de Madrid.
+- Más portales del tercer sector (Canal ONG…).
 - Comandos en el bot (`/keywords`, `/añadir …`) para que ella ajuste filtros sin tocar código.
 - Resumen diario además de las alertas sueltas.
