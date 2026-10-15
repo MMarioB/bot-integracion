@@ -17,7 +17,8 @@ import (
 
 type Notifier interface {
 	Job(ctx context.Context, j job.Job) error
-	Text(ctx context.Context, msg string) error
+	Text(ctx context.Context, msg string) error // texto plano (se escapa)
+	HTML(ctx context.Context, msg string) error // HTML ya formateado
 }
 
 // Telegram envía mensajes con la Bot API (token de @BotFather).
@@ -34,6 +35,10 @@ func (t *Telegram) Job(ctx context.Context, j job.Job) error {
 
 func (t *Telegram) Text(ctx context.Context, msg string) error {
 	return t.send(ctx, html.EscapeString(msg))
+}
+
+func (t *Telegram) HTML(ctx context.Context, msg string) error {
+	return t.send(ctx, msg)
 }
 
 func (t *Telegram) send(ctx context.Context, text string) error {
@@ -88,6 +93,49 @@ func FormatJob(j job.Job) string {
 	return b.String()
 }
 
+// maxMsg deja margen bajo el límite de 4096 caracteres de Telegram.
+const maxMsg = 3800
+
+// FormatDigest compone el resumen inicial con todas las ofertas actuales,
+// partido en varios mensajes si no cabe en uno.
+func FormatDigest(jobs []job.Job) []string {
+	if len(jobs) == 0 {
+		return []string{"👋 <b>Bot de ofertas en marcha.</b>\nAhora mismo no hay ofertas publicadas que encajen. " +
+			"Te aviso en cuanto salga alguna."}
+	}
+	header := fmt.Sprintf("👋 <b>Bot de ofertas en marcha.</b>\nEstas son las %d ofertas publicadas ahora mismo. "+
+		"A partir de aquí te aviso solo de las nuevas.\n\n", len(jobs))
+
+	var msgs []string
+	var b strings.Builder
+	b.WriteString(header)
+	for i, j := range jobs {
+		var line strings.Builder
+		fmt.Fprintf(&line, "%d. <a href=\"%s\">%s</a>", i+1, html.EscapeString(j.URL), html.EscapeString(truncate(j.Title, 120)))
+		var meta []string
+		if j.Company != "" {
+			meta = append(meta, j.Company)
+		}
+		if j.Location != "" {
+			meta = append(meta, j.Location)
+		}
+		if len(meta) > 0 {
+			fmt.Fprintf(&line, "\n    <i>%s</i>", html.EscapeString(truncate(strings.Join(meta, " · "), 120)))
+		}
+		line.WriteString("\n")
+
+		if b.Len()+line.Len() > maxMsg {
+			msgs = append(msgs, b.String())
+			b.Reset()
+		}
+		b.WriteString(line.String())
+	}
+	if b.Len() > 0 {
+		msgs = append(msgs, b.String())
+	}
+	return msgs
+}
+
 func truncate(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
@@ -106,6 +154,11 @@ func (Stdout) Job(_ context.Context, j job.Job) error {
 }
 
 func (Stdout) Text(_ context.Context, msg string) error {
+	fmt.Println(msg)
+	return nil
+}
+
+func (Stdout) HTML(_ context.Context, msg string) error {
 	fmt.Println(msg)
 	return nil
 }

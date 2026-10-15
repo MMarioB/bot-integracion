@@ -30,8 +30,13 @@ export INFOJOBS_CLIENT_ID=... INFOJOBS_CLIENT_SECRET=...
 go run ./cmd/ofertas-bot -once                    # una pasada real
 ```
 
-En la **primera ejecución real** no manda todas las ofertas que ya existen: las marca como
-vistas y envía un único mensaje de bienvenida. A partir de ahí avisa solo de las nuevas.
+En la **primera ejecución real** manda un **resumen agrupado** con todas las ofertas publicadas
+en ese momento (en pocos mensajes, no uno por oferta). A partir de ahí avisa solo de las nuevas.
+
+¿Quieres volver a ver todo lo que hay publicado ahora mismo, aunque ya se haya avisado?
+```bash
+go run ./cmd/ofertas-bot -once -digest
+```
 
 ## Despliegue
 

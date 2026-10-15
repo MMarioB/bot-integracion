@@ -44,6 +44,7 @@ func main() {
 	once := flag.Bool("once", false, "ejecuta una pasada y termina (para cron / GitHub Actions)")
 	interval := flag.Duration("interval", 2*time.Hour, "cada cuánto buscar en modo continuo")
 	dryRun := flag.Bool("dry-run", false, "imprime por consola en vez de enviar a Telegram y no guarda estado")
+	digest := flag.Bool("digest", false, "envía un resumen con TODAS las ofertas publicadas ahora (incluidas las ya avisadas)")
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -77,6 +78,7 @@ func main() {
 		store:    st,
 		notifier: n,
 		dryRun:   *dryRun,
+		digest:   *digest,
 		maxAge:   time.Duration(cfg.StateMaxDays) * 24 * time.Hour,
 	}
 	if len(app.fetchers) == 0 {
@@ -111,6 +113,7 @@ type App struct {
 	store    *store.Store
 	notifier notify.Notifier
 	dryRun   bool
+	digest   bool // resumen completo en la próxima pasada
 	maxAge   time.Duration
 }
 
@@ -147,7 +150,7 @@ func (a *App) RunOnce(ctx context.Context) {
 	dup := map[string]bool{}
 	for _, j := range all {
 		k := j.Key()
-		if dup[k] || a.store.Seen(k) || !a.filter.Match(j) {
+		if dup[k] || (!a.digest && a.store.Seen(k)) || !a.filter.Match(j) {
 			continue
 		}
 		dup[k] = true
@@ -155,15 +158,20 @@ func (a *App) RunOnce(ctx context.Context) {
 	}
 	sort.Slice(fresh, func(i, k int) bool { return fresh[i].Published.Before(fresh[k].Published) })
 
-	// Primera ejecución: no inundamos el chat con todo lo que ya está publicado.
-	if a.store.FirstRun() && !a.dryRun {
+	// Primera ejecución: en vez de un mensaje por oferta, un resumen agrupado
+	// con todo lo que hay publicado ahora mismo.
+	if (a.store.FirstRun() || a.digest) && !a.dryRun {
+		a.digest = false
+		for _, msg := range notify.FormatDigest(fresh) {
+			if err := a.notifier.HTML(ctx, msg); err != nil {
+				a.log.Error("telegram", "err", err)
+				return // sin guardar estado: se reintenta la bienvenida en la siguiente pasada
+			}
+		}
 		for _, j := range fresh {
 			a.store.Mark(j.Key())
 		}
-		msg := fmt.Sprintf("👋 Bot de ofertas en marcha. Hay %d ofertas activas que encajan; a partir de ahora te aviso solo de las nuevas.", len(fresh))
-		if err := a.notifier.Text(ctx, msg); err != nil {
-			a.log.Error("telegram", "err", err)
-		}
+		a.log.Info("resumen inicial enviado", "ofertas", len(fresh))
 		a.save()
 		return
 	}

@@ -37,3 +37,37 @@ func TestTelegramSend(t *testing.T) {
 		t.Errorf("escape HTML incorrecto: %s", text)
 	}
 }
+
+func TestFormatDigest(t *testing.T) {
+	if msgs := FormatDigest(nil); len(msgs) != 1 || !strings.Contains(msgs[0], "no hay ofertas") {
+		t.Errorf("resumen vacío inesperado: %v", msgs)
+	}
+
+	var jobs []job.Job
+	for i := 0; i < 60; i++ {
+		jobs = append(jobs, job.Job{
+			Title: strings.Repeat("Integradora social & ", 4), Company: "Fundación <X>",
+			Location: "Madrid", URL: "https://example.com/oferta?id=1&x=2", Source: "infojobs",
+		})
+	}
+	msgs := FormatDigest(jobs)
+	if len(msgs) < 2 {
+		t.Fatalf("60 ofertas largas deberían partirse en varios mensajes, hay %d", len(msgs))
+	}
+	total := 0
+	for _, m := range msgs {
+		if len([]rune(m)) > 4096 {
+			t.Errorf("mensaje de %d caracteres supera el límite de Telegram", len([]rune(m)))
+		}
+		total += strings.Count(m, "<a href=")
+		if strings.Contains(m, "<X>") || strings.Contains(m, "&x=2") {
+			t.Error("contenido sin escapar en el resumen")
+		}
+	}
+	if total != 60 {
+		t.Errorf("se esperaban 60 ofertas en el resumen, hay %d", total)
+	}
+	if !strings.Contains(msgs[0], "Estas son las 60 ofertas") {
+		t.Errorf("cabecera inesperada: %s", msgs[0][:100])
+	}
+}
