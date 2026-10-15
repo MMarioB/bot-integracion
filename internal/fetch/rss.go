@@ -20,7 +20,11 @@ type RSS struct {
 	SourceName string
 	URL        string
 	Location   string // ubicación por defecto si el feed no la trae (p. ej. "Comunidad de Madrid")
-	HTTP       *http.Client
+	Label      string // nombre a mostrar como entidad; vacío = título del canal RSS
+	// TitleFromDescription usa la descripción como título. Para feeds como el del BOCM,
+	// donde el título es genérico ("Orden Nº 30 / Boletín Nº 246") y el contenido va en la descripción.
+	TitleFromDescription bool
+	HTTP                 *http.Client
 }
 
 func (f *RSS) Name() string { return f.SourceName }
@@ -73,14 +77,22 @@ func (f *RSS) Fetch(ctx context.Context) ([]job.Job, error) {
 			id = strings.TrimSpace(it.Link)
 		}
 		published, _ := time.Parse(time.RFC1123Z, strings.TrimSpace(it.PubDate))
+		title, summary := clean(it.Title), clean(it.Description)
+		if f.TitleFromDescription && summary != "" {
+			title, summary = summary, title
+		}
+		company := f.Label
+		if company == "" {
+			company = clean(doc.Channel.Title)
+		}
 		jobs = append(jobs, job.Job{
 			ID:        id,
 			Source:    f.SourceName,
-			Title:     clean(it.Title),
-			Company:   clean(doc.Channel.Title),
+			Title:     title,
+			Company:   company,
 			Location:  f.Location,
 			URL:       strings.TrimSpace(it.Link),
-			Summary:   clean(it.Description),
+			Summary:   summary,
 			Published: published,
 		})
 	}

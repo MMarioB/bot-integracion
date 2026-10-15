@@ -31,9 +31,11 @@ type Config struct {
 		Queries  []string `json:"queries"`
 	} `json:"infojobs"`
 	RSS []struct {
-		Name     string `json:"name"`
-		URL      string `json:"url"`
-		Location string `json:"location"`
+		Name                 string `json:"name"`
+		URL                  string `json:"url"`
+		Location             string `json:"location"`
+		Label                string `json:"label"`
+		TitleFromDescription bool   `json:"title_from_description"`
 	} `json:"rss"`
 	StatePath    string `json:"state_path"`
 	StateMaxDays int    `json:"state_max_days"`
@@ -214,7 +216,11 @@ func buildFetchers(cfg *Config, log *slog.Logger) []job.Fetcher {
 		}
 	}
 	for _, r := range cfg.RSS {
-		fs = append(fs, &fetch.RSS{SourceName: r.Name, URL: r.URL, Location: r.Location, HTTP: httpc})
+		fs = append(fs, &fetch.RSS{
+			SourceName: r.Name, URL: r.URL, Location: r.Location,
+			Label: r.Label, TitleFromDescription: r.TitleFromDescription,
+			HTTP: httpc,
+		})
 	}
 	return fs
 }

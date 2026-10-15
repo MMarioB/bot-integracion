@@ -88,3 +88,27 @@ func TestInfoJobsFetch(t *testing.T) {
 		t.Error("esperaba error con credenciales malas")
 	}
 }
+
+func TestRSSTitleFromDescription(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>
+<title>Ordenes ultimo boletin</title>
+<item><title>Orden Nº 30 / Boletín Nº 246 año 2026</title><link>https://www.bocm.es/o30</link>
+<description>AYUNTAMIENTO DE GETAFE. Bolsa de Técnico Superior en Integración Social</description></item>
+</channel></rss>`))
+	}))
+	defer srv.Close()
+
+	f := &RSS{SourceName: "bocm", URL: srv.URL, Label: "BOCM", TitleFromDescription: true}
+	jobs, err := f.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := jobs[0]
+	if j.Title != "AYUNTAMIENTO DE GETAFE. Bolsa de Técnico Superior en Integración Social" {
+		t.Errorf("el título debería venir de la descripción: %q", j.Title)
+	}
+	if j.Summary != "Orden Nº 30 / Boletín Nº 246 año 2026" || j.Company != "BOCM" {
+		t.Errorf("resumen/entidad inesperados: %+v", j)
+	}
+}

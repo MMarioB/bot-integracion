@@ -79,7 +79,7 @@ func (t *Telegram) send(ctx context.Context, text string) error {
 // FormatJob compone el mensaje HTML de una oferta.
 func FormatJob(j job.Job) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "🆕 <b>%s</b>\n", html.EscapeString(j.Title))
+	fmt.Fprintf(&b, "🆕 <b>%s</b>\n", html.EscapeString(truncate(j.Title, 250)))
 	if j.Company != "" {
 		fmt.Fprintf(&b, "🏢 %s\n", html.EscapeString(j.Company))
 	}
@@ -111,7 +111,7 @@ func FormatDigest(jobs []job.Job) []string {
 	b.WriteString(header)
 	for i, j := range jobs {
 		var line strings.Builder
-		fmt.Fprintf(&line, "%d. <a href=\"%s\">%s</a>", i+1, html.EscapeString(j.URL), html.EscapeString(truncate(j.Title, 120)))
+		fmt.Fprintf(&line, "%d. <a href=\"%s\">%s</a>", i+1, html.EscapeString(j.URL), html.EscapeString(truncate(j.Title, 200)))
 		var meta []string
 		if j.Company != "" {
 			meta = append(meta, j.Company)

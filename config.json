@@ -29,7 +29,9 @@
     {
       "name": "bocm",
       "url": "https://www.bocm.es/ultimo-boletin.xml",
-      "location": "Comunidad de Madrid"
+      "location": "Comunidad de Madrid",
+      "label": "BOCM",
+      "title_from_description": true
     }
   ],
   "state_path": "data/seen.json",
