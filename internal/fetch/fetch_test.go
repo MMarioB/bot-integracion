@@ -117,7 +117,7 @@ const hfFixture = `<html><body>
 <div class="oferta">
   <a href="/oportunidades/remuneradas/detalle/integradora-social-centro-de-dia/278600"><img src="logo.png"></a>
   <h3><a href="/oportunidades/remuneradas/detalle/integradora-social-centro-de-dia/278600">Integradora social centro de d&iacute;a</a></h3>
-  <p class="ong">Fundaci&oacute;n Ejemplo</p>
+  <p class="ong">Fundaci&oacute;n Ejemplo</p> |
   <p class="lugar">Espa&ntilde;a(Madrid)</p>
   <p>Buscamos integradora social para centro de d&iacute;a...</p>
   <a href="/oportunidades/remuneradas/interes/278600">Me interesa</a>

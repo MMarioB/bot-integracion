@@ -101,7 +101,7 @@ func parseHacesfalta(page, base string) []job.Job {
 			loc = text[lm[2]:lm[3]]
 			// Entre el título y la ubicación suele ir la entidad.
 			if t := strings.Index(text, c.title); c.title != "" && t >= 0 && t+len(c.title) <= lm[0] {
-				company = strings.TrimSpace(text[t+len(c.title) : lm[0]])
+				company = strings.Trim(text[t+len(c.title):lm[0]], " |·•-–—,;:")
 				if len([]rune(company)) > 80 {
 					company = ""
 				}
