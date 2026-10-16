@@ -74,7 +74,7 @@ go run ./cmd/ofertas-bot -once -digest
 ## Despliegue
 
 **GitHub Actions (gratis, sin servidor).** El workflow `.github/workflows/ofertas.yml`
-se ejecuta cada 2 horas, solo de día (aprox. 8–20 h en Madrid). Añade en *Settings → Secrets → Actions*:
+se ejecuta cada 30 minutos, solo de día (aprox. 8–21 h en Madrid). Añade en *Settings → Secrets → Actions*:
 `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `ALERTS_EMAIL`, `ALERTS_EMAIL_PASSWORD`.
 El estado se guarda en la caché de Actions. Nota: GitHub desactiva los crons de repos sin
 actividad durante 60 días; un commit de vez en cuando lo evita.
