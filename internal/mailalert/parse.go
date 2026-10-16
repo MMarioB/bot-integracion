@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/mario/ofertas-bot/internal/filter"
@@ -40,6 +41,7 @@ var noiseText = []string{
 	"darte de baja", "darse de baja", "dejar de recibir", "unsubscribe", "baja de",
 	"privacidad", "cookies", "condiciones", "aviso legal", "ayuda", "help",
 	"preferencias", "configura", "gestionar", "editar alerta", "modificar alerta", "tus alertas",
+	"eliminar", "borrar", "menu privado", "cancelar", "opinion", "encuesta",
 	"ver mas", "ver todas", "ver todos", "mas ofertas", "see all", "view all",
 	"descarga la app", "app store", "google play", "perfil", "iniciar sesion", "accede",
 	"facebook", "twitter", "instagram", "youtube", "tiktok",
@@ -188,25 +190,34 @@ func portalFor(from string) (portal, bool) {
 
 var (
 	anchorOpenRe = regexp.MustCompile(`(?i)<a\b`)
-	anchorRe     = regexp.MustCompile(`(?is)<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>`)
+	anchorRe     = regexp.MustCompile(`(?is)<a\b([^>]*)>(.*?)</a>`)
+	hrefAttrRe   = regexp.MustCompile(`(?is)\bhref\s*=\s*["']([^"']+)["']`)
 	dropBlockRe  = regexp.MustCompile(`(?is)<(style|script|head)\b.*?</(style|script|head)>`)
+	blockTagRe   = regexp.MustCompile(`(?i)</?(td|tr|p|div|li|br|table|h[1-6])\b[^>]*>`)
 	tagRe        = regexp.MustCompile(`<[^>]*>`)
 	spaceRe      = regexp.MustCompile(`\s+`)
+
+	// InfoJobs marca cada oferta con name="push-of-i<id>": es el id real de la oferta.
+	infojobsOfferRe = regexp.MustCompile(`(?i)\bname\s*=\s*["']push-(of-i[0-9a-z]+)["']`)
 )
 
 func cleanText(s string) string {
 	s = tagRe.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
-	s = strings.ReplaceAll(s, " ", " ")
+	s = strings.ReplaceAll(s, "\u00a0", " ")
 	return strings.TrimSpace(spaceRe.ReplaceAllString(s, " "))
 }
 
 // ExtractJobs saca las ofertas de un correo de alerta. Devuelve ok=false si el correo
 // no es de un portal conocido.
 //
-// Estrategia genérica (válida mientras no haya un parser específico por portal):
-// enlaces al dominio del portal cuyo texto parece un título de oferta. El texto que
-// sigue al enlace hasta el siguiente enlace de oferta se usa como entidad/ubicación.
+//   - InfoJobs: solo los enlaces marcados como oferta (name="push-of-i…"); el resto del
+//     correo (gestionar/eliminar alerta, pie legal) se ignora.
+//   - Resto de portales: estrategia genérica, enlaces al dominio del portal cuyo texto
+//     parece un título de oferta.
+//
+// En ambos casos, las celdas que siguen al título hasta el siguiente enlace son la
+// entidad y la ubicación.
 func ExtractJobs(msg *Message) ([]job.Job, bool) {
 	p, ok := portalFor(msg.From)
 	if !ok {
@@ -215,23 +226,37 @@ func ExtractJobs(msg *Message) ([]job.Job, bool) {
 	page := dropBlockRe.ReplaceAllString(msg.HTML, " ")
 
 	type link struct {
-		href, title string
-		start, end  int
+		href, title, id string
+		start, end      int
 	}
 	var links []link
 	seenTitle := map[string]bool{}
 	for _, m := range anchorRe.FindAllStringSubmatchIndex(page, -1) {
-		href := html.UnescapeString(strings.TrimSpace(page[m[2]:m[3]]))
+		attrs := page[m[2]:m[3]]
+		hm := hrefAttrRe.FindStringSubmatch(attrs)
+		if hm == nil {
+			continue
+		}
+		href := html.UnescapeString(strings.TrimSpace(hm[1]))
 		title := cleanText(page[m[4]:m[5]])
+
+		var id string
+		if p.source == "infojobs" {
+			im := infojobsOfferRe.FindStringSubmatch(attrs)
+			if im == nil {
+				continue
+			}
+			id = strings.ToLower(im[1])
+		}
 		if !hostMatches(href, p.hosts) || !looksLikeJobTitle(title) {
 			continue
 		}
-		key := filter.Normalize(title)
+		key := filter.Normalize(title) + "|" + id
 		if seenTitle[key] { // el mismo título suele enlazarse dos veces (logo + texto)
 			continue
 		}
 		seenTitle[key] = true
-		links = append(links, link{href: href, title: title, start: m[0], end: m[1]})
+		links = append(links, link{href: href, title: prettyTitle(title), id: id, start: m[0], end: m[1]})
 	}
 
 	jobs := make([]job.Job, 0, len(links))
@@ -240,24 +265,91 @@ func ExtractJobs(msg *Message) ([]job.Job, bool) {
 		if i+1 < len(links) {
 			end = links[i+1].start
 		}
-		// La entidad/ubicación es el texto hasta el siguiente enlace, sea o no de oferta
+		// La entidad/ubicación es lo que hay hasta el siguiente enlace, sea o no de oferta
 		// (así no se cuela el texto del pie en la última).
 		if k := anchorOpenRe.FindStringIndex(page[l.end:end]); k != nil {
 			end = l.end + k[0]
 		}
-		company, location := splitMeta(cleanText(page[l.end:end]))
+		company, location, extra := metaFromCells(page[l.end:end])
+		id := l.id
+		if id == "" {
+			id = stableID(p.source, l.title, company)
+		}
 		jobs = append(jobs, job.Job{
-			ID:          stableID(p.source, l.title, company),
+			ID:          id,
 			Source:      p.source,
 			Title:       l.title,
 			Company:     company,
 			Location:    location,
+			Summary:     extra,
 			URL:         l.href,
 			Published:   msg.Date,
 			Prefiltered: true, // el portal ya ha filtrado según la alerta guardada
 		})
 	}
 	return jobs, true
+}
+
+// metaFromCells separa el bloque que sigue al título en celdas (td, p, div…):
+// la 1ª es la entidad, la 2ª "Ubicación | Tipo de contrato | …". Si todo va en una sola
+// celda, se intenta separar por "·", "|" o "-".
+func metaFromCells(fragment string) (company, location, extra string) {
+	var cells []string
+	for _, c := range blockTagRe.Split(fragment, -1) {
+		if t := cleanText(c); t != "" {
+			cells = append(cells, t)
+		}
+	}
+	switch len(cells) {
+	case 0:
+		return "", "", ""
+	case 1:
+		company, location = splitMeta(cells[0])
+		return company, location, ""
+	}
+	company = truncateRunes(cells[0], 80)
+	parts := strings.Split(cells[1], "|")
+	location = strings.TrimSpace(parts[0])
+	var rest []string
+	for _, x := range parts[1:] {
+		if x = strings.TrimSpace(x); x != "" {
+			rest = append(rest, x)
+		}
+	}
+	return company, location, strings.Join(rest, " · ")
+}
+
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return strings.TrimSpace(string(r[:n])) + "…"
+}
+
+// prettyTitle pasa los títulos EN MAYÚSCULAS a minúsculas con la primera en mayúscula
+// ("TÉCNICO-A DE INTEGRACIÓN SOCIAL" -> "Técnico-a de integración social").
+func prettyTitle(t string) string {
+	letters, upper := 0, 0
+	for _, r := range t {
+		if unicode.IsLetter(r) {
+			letters++
+			if unicode.IsUpper(r) {
+				upper++
+			}
+		}
+	}
+	if letters < 6 || upper*10 < letters*9 { // no está (casi) todo en mayúsculas
+		return t
+	}
+	r := []rune(strings.ToLower(t))
+	for i, c := range r {
+		if unicode.IsLetter(c) {
+			r[i] = unicode.ToUpper(c)
+			break
+		}
+	}
+	return string(r)
 }
 
 func hostMatches(href string, hosts []string) bool {
