@@ -36,7 +36,7 @@ type portal struct {
 }
 
 var portals = []portal{
-	{source: "infojobs", senders: []string{"infojobs.net"}, hosts: []string{"infojobs.net"}, trusted: true},
+	{source: "infojobs", senders: []string{"infojobs.net"}, hosts: []string{"infojobs.net"}},
 	{source: "indeed", senders: []string{"indeed.com", "indeedemail.com"}, hosts: []string{"indeed.com"}},
 	{source: "linkedin", senders: []string{"linkedin.com"}, hosts: []string{"linkedin.com"}},
 }
