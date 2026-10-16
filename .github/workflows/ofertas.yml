@@ -2,10 +2,10 @@ name: ofertas-bot
 
 on:
   schedule:
-    # Cada 30 minutos, solo de día: 8:17-20:47 en verano y 7:17-19:47 en invierno (hora de Madrid).
+    # Cada hora, solo de día: 8:17-20:17 en verano y 7:17-19:17 en invierno (hora de Madrid).
     # Nada de avisos de noche.
-    - cron: "17,47 6-18 * * *"
-  workflow_dispatch: {}
+    - cron: "17 6-18 * * *"
+   workflow_dispatch: {}
 
 concurrency:
   group: ofertas-bot
