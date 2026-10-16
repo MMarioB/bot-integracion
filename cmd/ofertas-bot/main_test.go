@@ -92,3 +92,34 @@ func TestNewSourceGoesToDigest(t *testing.T) {
 		t.Fatalf("tercera pasada: digests=%v jobs=%v", n.digests, n.jobs)
 	}
 }
+
+// Una alerta de Indeed trae de todo (cajeros, limpieza, textos del pie): solo debe llegar
+// lo que pasa el filtro de palabras clave. Las de InfoJobs (fiables) llegan tal cual.
+func TestPortalAlertsFiltering(t *testing.T) {
+	st, _ := store.Open(filepath.Join(t.TempDir(), "seen.json"))
+	n := &fakeNotifier{}
+	alerts := &fakeFetcher{name: "email", jobs: []job.Job{
+		{Source: "indeed", ID: "1", Title: "Cajero/a - Reponedor/a - Villarejo de Salvanés 30h/Rotativo"},
+		{Source: "indeed", ID: "2", Title: "Técnico/a de Integración Mecánica y Estructural"},
+		{Source: "indeed", ID: "3", Title: "desde ayer"},
+		{Source: "indeed", ID: "4", Title: "Crea tu CV Indeed"},
+		{Source: "indeed", ID: "5", Title: "Integradora social - piso tutelado"},
+		{Source: "infojobs", ID: "of-i1", Title: "Educador/a centro de menores", Prefiltered: true},
+	}}
+	app := newApp(t, st, n, alerts)
+	app.filter = filter.New([]string{"integradora social", "integracion social"}, []string{"voluntariado"})
+	app.store.Mark("bocm:x") // bot ya arrancado
+	app.RunOnce(context.Background())
+
+	sent := strings.Join(append(append([]string{}, n.jobs...), n.digests...), "\n")
+	for _, bad := range []string{"Cajero", "Mecánica", "desde ayer", "Crea tu CV"} {
+		if strings.Contains(sent, bad) {
+			t.Errorf("no debería haberse enviado %q:\n%s", bad, sent)
+		}
+	}
+	for _, good := range []string{"Integradora social - piso tutelado", "Educador/a centro de menores"} {
+		if !strings.Contains(sent, good) {
+			t.Errorf("debería haberse enviado %q:\n%s", good, sent)
+		}
+	}
+}

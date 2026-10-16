@@ -68,7 +68,7 @@ func TestExtractJobs(t *testing.T) {
 	}
 	j := jobs[0]
 	if j.Source != "indeed" || j.Title != "Integradora social - centro de día" || j.Company != "Fundación Ejemplo" ||
-		j.Location != "Getafe" || j.URL != "https://es.indeed.com/t/abc1" || !j.Prefiltered {
+		j.Location != "Getafe" || j.URL != "https://es.indeed.com/t/abc1" || j.Prefiltered {
 		t.Errorf("oferta 1 mal: %+v", j)
 	}
 	if jobs[1].Title != "Técnico/a de integración social (jornada parcial)" || jobs[1].Company != "Asociación Otra" || jobs[1].Location != "Madrid" {
@@ -226,6 +226,9 @@ func TestInfoJobsRealAlert(t *testing.T) {
 		if got[k] != v {
 			t.Errorf("%s = %q, quería %q", k, got[k], v)
 		}
+	}
+	if !j.Prefiltered {
+		t.Error("las alertas de InfoJobs son precisas: deberían ir marcadas como prefiltradas")
 	}
 	if !strings.HasPrefix(j.URL, "https://link.push.infojobs.net/") {
 		t.Errorf("enlace inesperado: %s", j.URL)

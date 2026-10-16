@@ -28,10 +28,15 @@ type portal struct {
 	source  string   // nombre de la fuente ("infojobs")
 	senders []string // dominios del remitente
 	hosts   []string // dominios a los que apuntan los enlaces de ofertas (incluido el de tracking)
+	// trusted: la alerta del portal es precisa, así que sus ofertas no pasan por el filtro
+	// de palabras clave (solo por las exclusiones). Solo para portales verificados con
+	// correos reales: Indeed, por ejemplo, mete cajeros y limpieza en una alerta de
+	// "integración social".
+	trusted bool
 }
 
 var portals = []portal{
-	{source: "infojobs", senders: []string{"infojobs.net"}, hosts: []string{"infojobs.net"}},
+	{source: "infojobs", senders: []string{"infojobs.net"}, hosts: []string{"infojobs.net"}, trusted: true},
 	{source: "indeed", senders: []string{"indeed.com", "indeedemail.com"}, hosts: []string{"indeed.com"}},
 	{source: "linkedin", senders: []string{"linkedin.com"}, hosts: []string{"linkedin.com"}},
 }
@@ -284,7 +289,7 @@ func ExtractJobs(msg *Message) ([]job.Job, bool) {
 			Summary:     extra,
 			URL:         l.href,
 			Published:   msg.Date,
-			Prefiltered: true, // el portal ya ha filtrado según la alerta guardada
+			Prefiltered: p.trusted,
 		})
 	}
 	return jobs, true
